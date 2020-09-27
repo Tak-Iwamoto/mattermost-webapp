@@ -5,7 +5,8 @@ import React from 'react';
 import {shallow} from 'enzyme';
 
 import {sendAddToChannelEphemeralPost} from 'actions/global_actions.jsx';
-import PostAddChannelMember from 'components/post_view/post_add_channel_member/post_add_channel_member.jsx';
+
+import PostAddChannelMember from 'components/post_view/post_add_channel_member/post_add_channel_member';
 
 jest.mock('actions/global_actions.jsx', () => {
     return {

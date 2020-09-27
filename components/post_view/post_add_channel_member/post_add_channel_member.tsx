@@ -1,70 +1,77 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import PropTypes from 'prop-types';
 import React from 'react';
 import {FormattedMessage} from 'react-intl';
 
+import {Post} from 'mattermost-redux/types/posts';
+import {UserProfile} from 'mattermost-redux/types/users';
+
 import {sendAddToChannelEphemeralPost} from 'actions/global_actions.jsx';
+
 import {Constants} from 'utils/constants';
 import {t} from 'utils/i18n';
 import AtMention from 'components/at_mention';
 
-export default class PostAddChannelMember extends React.PureComponent {
-    constructor(props) {
+type Props = {
+
+    /*
+    * Current user
+    */
+    currentUser: UserProfile;
+
+    /*
+    * Type of current channel
+    */
+    channelType: string;
+
+    /*
+    * ID of ephemeral post (at-mention's "add to channel" post)
+    */
+    postId: string;
+
+    /*
+    * Ephemeral post (at-mention's "add to channel" post)
+    */
+    post: Post,
+
+    /*
+    * user ids to add to channel
+    */
+    userIds: string[]
+
+    /*
+    * usernames to add to channel
+    */
+    usernames: string[],
+
+    noGroupsUsernames: string[],
+
+    actions: {
+
+        /*
+        * Function to add members to channel
+        */
+        addChannelMember: (channelId: string, userId: string) => void;
+
+        /*
+        * Function to remove post (ephemeral)
+        */
+        removePost: (post: Post) => void;
+    };
+}
+
+type State = {
+    expanded: boolean;
+}
+
+export default class PostAddChannelMember extends React.PureComponent<Props, State> {
+    constructor(props: Props) {
         super(props);
 
         this.state = {
             expanded: false,
         };
-    }
-
-    static propTypes = {
-
-        /*
-        * Current user
-        */
-        currentUser: PropTypes.object.isRequired,
-
-        /*
-        * Type of current channel
-        */
-        channelType: PropTypes.string.isRequired,
-
-        /*
-        * ID of ephemeral post (at-mention's "add to channel" post)
-        */
-        postId: PropTypes.string.isRequired,
-
-        /*
-        * Ephemeral post (at-mention's "add to channel" post)
-        */
-        post: PropTypes.object.isRequired,
-
-        /*
-        * user ids to add to channel
-        */
-        userIds: PropTypes.array.isRequired,
-
-        /*
-        * usernames to add to channel
-        */
-        usernames: PropTypes.array.isRequired,
-
-        noGroupsUsernames: PropTypes.array.isRequired,
-
-        actions: PropTypes.shape({
-
-            /*
-            * Function to add members to channel
-            */
-            addChannelMember: PropTypes.func.isRequired,
-
-            /*
-            * Function to remove post (ephemeral)
-            */
-            removePost: PropTypes.func.isRequired,
-        }).isRequired,
     }
 
     handleAddChannelMember = () => {
@@ -86,13 +93,13 @@ export default class PostAddChannelMember extends React.PureComponent {
         this.setState({expanded: true});
     }
 
-    generateAtMentions(usernames = []) {
+    generateAtMentions(usernames: string[] = []) {
         if (usernames.length === 1) {
             return (
                 <AtMention mentionName={usernames[0]}/>
             );
         } else if (usernames.length > 1) {
-            function andSeparator(key) {
+            function andSeparator(key: number) {
                 return (
                     <FormattedMessage
                         key={key}
@@ -102,7 +109,7 @@ export default class PostAddChannelMember extends React.PureComponent {
                 );
             }
 
-            function commaSeparator(key) {
+            function commaSeparator(key: number) {
                 return <span key={key}>{', '}</span>;
             }
 
@@ -199,8 +206,8 @@ export default class PostAddChannelMember extends React.PureComponent {
             outOfGroupsMessageText = 'did not get notified by this mention because they are not in the channel. They cannot be added to the channel because they are not a member of the linked groups. To add them to this channel, they must be added to the linked groups.';
         }
 
-        var outOfChannelMessage = null;
-        var outOfGroupsMessage = null;
+        let outOfChannelMessage = null;
+        let outOfGroupsMessage = null;
 
         if (usernames.length) {
             outOfChannelMessage = (
