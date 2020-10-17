@@ -2,7 +2,7 @@
 // See LICENSE.txt for license information.
 
 import {connect} from 'react-redux';
-import {bindActionCreators} from 'redux';
+import {bindActionCreators, Dispatch} from 'redux';
 
 import {getCurrentUserId, getStatusForUserId, getUser} from 'mattermost-redux/selectors/entities/users';
 import {
@@ -15,6 +15,7 @@ import {
     getChannelMembersInChannels,
     canManageAnyChannelMembersInCurrentTeam,
 } from 'mattermost-redux/selectors/entities/channels';
+import {GenericAction} from 'mattermost-redux/types/actions';
 
 import {openDirectChannelToUserId} from 'actions/channel_actions.jsx';
 import {getMembershipForCurrentEntities} from 'actions/views/profile_popover';
@@ -23,9 +24,22 @@ import {closeModal, openModal} from 'actions/views/modals';
 import {areTimezonesEnabledAndSupported} from 'selectors/general';
 import {getSelectedPost, getRhsState} from 'selectors/rhs';
 
-import ProfilePopover from './profile_popover.jsx';
+import {GlobalState} from 'types/store';
 
-function mapStateToProps(state, ownProps) {
+import ProfilePopover from './profile_popover';
+
+type Props = {
+    userId: string;
+    src: string;
+    overwriteIcon?: string,
+    hideStatus?: boolean;
+    hide?: () => void;
+    isRHS?: boolean;
+    hasMention?: boolean;
+    overwriteName?: React.ReactNode;
+}
+
+function mapStateToProps(state: GlobalState, ownProps: Props) {
     const userId = ownProps.userId;
     const team = getCurrentTeam(state);
     const teamMember = getTeamMember(state, team.id, userId);
@@ -38,12 +52,7 @@ function mapStateToProps(state, ownProps) {
     const selectedPost = getSelectedPost(state);
     const currentChannel = getCurrentChannel(state);
 
-    let channelId;
-    if (selectedPost.exists === false) {
-        channelId = currentChannel.id;
-    } else {
-        channelId = selectedPost.channel_id;
-    }
+    const channelId = selectedPost ? selectedPost.channel_id : currentChannel.id;
 
     const channelMember = getChannelMembersInChannels(state)[channelId][userId];
 
@@ -58,7 +67,7 @@ function mapStateToProps(state, ownProps) {
         enableTimezone: areTimezonesEnabledAndSupported(state),
         isTeamAdmin,
         isChannelAdmin,
-        isInCurrentTeam: Boolean(teamMember) && teamMember.delete_at === 0,
+        isInCurrentTeam: teamMember ? Boolean(teamMember) && teamMember.delete_at === 0 : false,
         canManageAnyChannelMembersInCurrentTeam: canManageAnyChannelMembersInCurrentTeam(state),
         status: getStatusForUserId(state, userId),
         teamUrl: getCurrentRelativeTeamUrl(state),
@@ -67,7 +76,7 @@ function mapStateToProps(state, ownProps) {
     };
 }
 
-function mapDispatchToProps(dispatch) {
+function mapDispatchToProps(dispatch: Dispatch<GenericAction>) {
     return {
         actions: bindActionCreators({
             closeModal,

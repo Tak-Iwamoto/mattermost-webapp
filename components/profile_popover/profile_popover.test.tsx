@@ -6,13 +6,11 @@ import React from 'react';
 import {shallowWithIntl} from 'tests/helpers/intl-test-helper';
 import ProfilePopover from 'components/profile_popover/profile_popover';
 import Pluggable from '../../plugins/pluggable';
+import {TestHelper} from 'utils/test_helper';
 
 describe('components/ProfilePopover', () => {
     const baseProps = {
-        user: {
-            name: 'some name',
-            username: 'some_username',
-        },
+        user: TestHelper.getUserMock(),
         hide: jest.fn(),
         src: 'src',
         currentUserId: '',
@@ -21,6 +19,7 @@ describe('components/ProfilePopover', () => {
         isTeamAdmin: false,
         isInCurrentTeam: true,
         teamUrl: '',
+        enableTimezone: true,
         canManageAnyChannelMembersInCurrentTeam: true,
         actions: {
             getMembershipForCurrentEntities: jest.fn(),
@@ -43,10 +42,7 @@ describe('components/ProfilePopover', () => {
     test('should have bot description', () => {
         const props = {
             ...baseProps,
-            user: {
-                is_bot: true,
-                bot_description: 'bot description',
-            },
+            user: TestHelper.getUserMock({is_bot: true, bot_description: 'bot description'}),
         };
 
         const wrapper = shallowWithIntl(

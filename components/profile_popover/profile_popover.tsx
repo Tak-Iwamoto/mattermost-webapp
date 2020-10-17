@@ -1,12 +1,14 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import PropTypes from 'prop-types';
 import React from 'react';
 import {Tooltip} from 'react-bootstrap';
-import {FormattedMessage, injectIntl} from 'react-intl';
+import {FormattedMessage, injectIntl, IntlShape} from 'react-intl';
 
 import EventEmitter from 'mattermost-redux/utils/event_emitter';
+import {UserProfile} from 'mattermost-redux/types/users';
+
+import {Dictionary} from 'mattermost-redux/types/utilities';
 
 import Timestamp from 'components/timestamp';
 import OverlayTrigger from 'components/overlay_trigger';
@@ -15,7 +17,6 @@ import {browserHistory} from 'utils/browser_history';
 import * as GlobalActions from 'actions/global_actions.jsx';
 import Constants, {ModalIdentifiers, UserStatuses} from 'utils/constants';
 import {t} from 'utils/i18n';
-import {intlShape} from 'utils/react_intl';
 import * as Utils from 'utils/utils.jsx';
 import Pluggable from 'plugins/pluggable';
 
@@ -25,113 +26,125 @@ import ToggleModalButtonRedux from 'components/toggle_modal_button_redux';
 import Avatar from 'components/widgets/users/avatar';
 import Popover from 'components/widgets/popover';
 
+type Props = {
+    src: string;
+
+    /**
+     * Source URL from the image that should override default image
+     */
+    overwriteIcon?: string,
+
+    /**
+     * User the popover is being opened for
+     */
+    user?: UserProfile,
+
+    /**
+     * Status for the user, either 'offline', 'away', 'dnd' or 'online'
+     */
+    status?: string;
+
+    hideStatus?: boolean;
+
+    /**
+     * Function to call to hide the popover
+     */
+    hide?: () => void;
+
+    /**
+     * Set to true if the popover was opened from the right-hand
+     * sidebar (comment thread, search results, etc.)
+     */
+    isRHS?: boolean;
+
+    /**
+     * Returns state of modals in redux for determing which need to be closed
+     */
+
+    modals?: {
+        [modalId: string]: {
+            open: boolean;
+            dialogProps: Dictionary<any>;
+            dialogType: React.Component;
+        };
+    };
+
+    currentTeamId: string;
+
+    /**
+     * @internal
+     */
+    currentUserId: string;
+
+    /**
+     * @internal
+     */
+    hasMention?: boolean;
+
+    /**
+     * @internal
+     */
+    isInCurrentTeam: boolean;
+
+    /**
+     * @internal
+     */
+    teamUrl: string;
+
+    /**
+     * @internal
+     */
+    isTeamAdmin: boolean;
+
+    /**
+     * @internal
+     */
+    isChannelAdmin: boolean;
+
+    /**
+     * @internal
+     */
+    enableTimezone: boolean;
+
+    /**
+     * @internal
+     */
+    canManageAnyChannelMembersInCurrentTeam: boolean;
+
+    /**
+     * The overwritten username that should be shown at the top of the popover
+     */
+    overwriteName?: React.ReactNode;
+
+    /**
+     * @internal
+     */
+    actions: {
+        getMembershipForCurrentEntities: (userId: string) => void,
+        openDirectChannelToUserId: (userId: string) => Promise<{data: boolean, error: Error}>,
+        openModal: (data: {ModalId: string; dialogType: typeof UserSettingsModal;}) => void,
+        closeModal: (modal: string) => void,
+    }
+
+    /**
+     * react-intl helper object
+     */
+    intl: IntlShape;
+}
+
+type State = {
+    loadingDMChannel: string;
+}
+
+type ClickEvent = React.MouseEvent<HTMLAnchorElement>
+
 /**
  * The profile popover, or hovercard, that appears with user information when clicking
  * on the username or profile picture of a user.
  */
-class ProfilePopover extends React.PureComponent {
+class ProfilePopover extends React.PureComponent<Props, State> {
     static getComponentName() {
         return 'ProfilePopover';
-    }
-
-    static propTypes = {
-
-        /**
-         * Source URL from the image to display in the popover
-         */
-        src: PropTypes.string.isRequired,
-
-        /**
-         * Source URL from the image that should override default image
-         */
-        overwriteIcon: PropTypes.string,
-
-        /**
-         * User the popover is being opened for
-         */
-        user: PropTypes.object,
-
-        /**
-         * Status for the user, either 'offline', 'away', 'dnd' or 'online'
-         */
-        status: PropTypes.string,
-
-        hideStatus: PropTypes.bool,
-
-        /**
-         * Function to call to hide the popover
-         */
-        hide: PropTypes.func,
-
-        /**
-         * Set to true if the popover was opened from the right-hand
-         * sidebar (comment thread, search results, etc.)
-         */
-        isRHS: PropTypes.bool,
-
-        /**
-         * Returns state of modals in redux for determing which need to be closed
-         */
-        modals: PropTypes.object,
-
-        currentTeamId: PropTypes.string.isRequired,
-
-        /**
-         * @internal
-         */
-        currentUserId: PropTypes.string.isRequired,
-
-        /**
-         * @internal
-         */
-        hasMention: PropTypes.bool,
-
-        /**
-         * @internal
-         */
-        isInCurrentTeam: PropTypes.bool.isRequired,
-
-        /**
-         * @internal
-         */
-        teamUrl: PropTypes.string.isRequired,
-
-        /**
-         * @internal
-         */
-        isTeamAdmin: PropTypes.bool.isRequired,
-
-        /**
-         * @internal
-         */
-        isChannelAdmin: PropTypes.bool.isRequired,
-
-        /**
-         * @internal
-         */
-        canManageAnyChannelMembersInCurrentTeam: PropTypes.bool.isRequired,
-
-        /**
-         * The overwritten username that should be shown at the top of the popover
-         */
-        overwriteName: PropTypes.node,
-
-        /**
-         * @internal
-         */
-        actions: PropTypes.shape({
-            getMembershipForCurrentEntities: PropTypes.func.isRequired,
-            openDirectChannelToUserId: PropTypes.func.isRequired,
-            openModal: PropTypes.func.isRequired,
-            closeModal: PropTypes.func.isRequired,
-        }).isRequired,
-
-        /**
-         * react-intl helper object
-         */
-        intl: intlShape.isRequired,
-
-        ...Popover.propTypes,
     }
 
     static defaultProps = {
@@ -140,19 +153,21 @@ class ProfilePopover extends React.PureComponent {
         status: UserStatuses.OFFLINE,
     }
 
-    constructor(props) {
+    constructor(props: Props) {
         super(props);
 
         this.state = {
-            loadingDMChannel: -1,
+            loadingDMChannel: '-1',
         };
     }
 
     componentDidMount() {
-        this.props.actions.getMembershipForCurrentEntities(this.props.userId);
+        if (this.props.user) {
+            this.props.actions.getMembershipForCurrentEntities(this.props.user.id);
+        }
     }
 
-    handleShowDirectChannel = (e) => {
+    handleShowDirectChannel = (e: ClickEvent) => {
         const {actions} = this.props;
         e.preventDefault();
 
@@ -162,7 +177,7 @@ class ProfilePopover extends React.PureComponent {
 
         const user = this.props.user;
 
-        if (this.state.loadingDMChannel !== -1) {
+        if (this.state.loadingDMChannel !== '-1') {
             return;
         }
 
@@ -173,7 +188,7 @@ class ProfilePopover extends React.PureComponent {
                 if (Utils.isMobile()) {
                     GlobalActions.emitCloseRightHandSide();
                 }
-                this.setState({loadingDMChannel: -1});
+                this.setState({loadingDMChannel: '-1'});
                 if (this.props.hide) {
                     this.props.hide();
                 }
@@ -183,7 +198,7 @@ class ProfilePopover extends React.PureComponent {
         this.handleCloseModals();
     }
 
-    handleMentionKeyClick = (e) => {
+    handleMentionKeyClick = (e: ClickEvent) => {
         e.preventDefault();
 
         if (!this.props.user) {
@@ -196,7 +211,7 @@ class ProfilePopover extends React.PureComponent {
         this.handleCloseModals();
     }
 
-    handleEditAccountSettings = (e) => {
+    handleEditAccountSettings = (e: ClickEvent) => {
         e.preventDefault();
 
         if (!this.props.user) {
@@ -209,7 +224,7 @@ class ProfilePopover extends React.PureComponent {
         this.handleCloseModals();
     }
 
-    handleAddToChannel = (e) => {
+    handleAddToChannel = (e: ClickEvent) => {
         e.preventDefault();
 
         this.handleCloseModals();
@@ -235,29 +250,10 @@ class ProfilePopover extends React.PureComponent {
         }
 
         const popoverProps = Object.assign({}, this.props);
-        delete popoverProps.user;
-        delete popoverProps.userId;
-        delete popoverProps.src;
-        delete popoverProps.status;
-        delete popoverProps.hideStatus;
-        delete popoverProps.isBusy;
-        delete popoverProps.hide;
-        delete popoverProps.isRHS;
-        delete popoverProps.hasMention;
-        delete popoverProps.dispatch;
-        delete popoverProps.enableTimezone;
-        delete popoverProps.currentUserId;
-        delete popoverProps.currentTeamId;
-        delete popoverProps.teamUrl;
-        delete popoverProps.actions;
-        delete popoverProps.isTeamAdmin;
-        delete popoverProps.isChannelAdmin;
-        delete popoverProps.canManageAnyChannelMembersInCurrentTeam;
-        delete popoverProps.intl;
 
         const {formatMessage} = this.props.intl;
 
-        var dataContent = [];
+        const dataContent = [];
         const urlSrc = this.props.overwriteIcon ?
             this.props.overwriteIcon : this.props.src;
 
@@ -502,7 +498,7 @@ class ProfilePopover extends React.PureComponent {
             roleTitle = <span className='user-popover__role'>{Utils.localizeMessage('admin.permissions.roles.channel_admin.name', 'Channel Admin')}</span>;
         }
 
-        let title = `@${this.props.user.username}`;
+        let title: React.ReactNode;
         if (this.props.overwriteName) {
             title = `${this.props.overwriteName}`;
             roleTitle = '';
@@ -529,7 +525,5 @@ class ProfilePopover extends React.PureComponent {
         );
     }
 }
-
-delete ProfilePopover.propTypes.id;
 
 export default injectIntl(ProfilePopover);
